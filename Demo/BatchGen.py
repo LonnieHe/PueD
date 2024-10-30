@@ -1,4 +1,5 @@
 ﻿import asyncio
+import csv
 import json
 from collections import defaultdict
 
@@ -56,7 +57,9 @@ class CustomWebSocketServer(WebSocketServer):
             if command == "collect":
                 await self.collect_room()
             elif command == "set":
-                await self.set_points()
+                await self.set_points(False)
+            elif command == "file":
+                await self.set_points(True)
             elif command == "move":
                 await self.send_to_clients(json.dumps(NameToImage.ZCZ_1))
             elif command.startswith("custom "):
@@ -75,7 +78,15 @@ class CustomWebSocketServer(WebSocketServer):
             }
             await self.send_to_clients(json.dumps(json_back))
 
-    async def set_points(self):
+    async def set_points(self, file):
+        if file:
+            with open("./output.csv", mode='w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
+                              "ParentObjectId", "CallbackData"]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+
         for location_id, devices in grouped_data.items():
 
             if location_id not in room_location:
@@ -90,25 +101,17 @@ class CustomWebSocketServer(WebSocketServer):
             np.random.shuffle(selected_points)
             # print(f"{location_id}当前房间高度: {room_location[location_id]['Z']}")
             for i, device in enumerate(devices):
-                json_back = {
-                    "event": "VirtualObject/Spawn",
-                    "payload":
-                        {
-                            "object_id": "",
-                            "object_class": "ImageDisplay",
-                            "name": device['description'],
-                            "tags": [],
-                            "visible": 'true',
-                            "transform":
-                                {
-                                    "coord_type": "UE4", "cad_mapkey": "",
-                                    "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
-                                              "y": room_location[location_id]['Y'] + selected_points[i][1],
-                                              "z": room_location[location_id]['Z']-15},
-                                    "rotate": {"roll": 0, "pitch": 0, "yaw": 0}, "scale": {"x": 1, "y": 1, "z": 1}
-                                },
-                            "class_prop":
-                                {
+                transform = {
+                    "coord_type": "UE4",
+                    "cad_mapkey": "",
+                    "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
+                              "y": room_location[location_id]['Y'] + selected_points[i][1],
+                              "z": room_location[location_id]['Z']},
+                    "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
+                    "scale": {"x": 1, "y": 1, "z": 1}
+                }
+
+                classprop = {
                                     "name": device['description'],
                                     "Type": "Type1",
                                     "auto_scale": True, "image_id": "",
@@ -122,13 +125,42 @@ class CustomWebSocketServer(WebSocketServer):
                                                    "font_color": {"A": 1, "B": 0.5, "G": 0.5, "R": 0.5}, "font_size": 16,
                                                    "offset": {"X": 20, "Y": 0},
                                                    "padding": {"Bottom": 0, "Left": 4, "Right": 4, "Top": 2.5}}
-                                },
-                            "callback_data":
-                                {
-                                }
-                        }
                 }
-                await self.send_to_clients(json.dumps(json_back))
+
+                tags = device['assetno'].split('-')[:-1]
+
+                if file:
+                    csv_data = {
+                        "ObjectId": "",
+                        "objectClass*": "ImageDisplay",
+                        "名称*": device['description'],
+                        "图层": "default",
+                        "标签": ','.join(tags),
+                        "是否可见": True,
+                        "Transform*": json.dumps(transform),
+                        "ClassProp*": json.dumps(classprop),
+                        "ParentObjectId": "",
+                        "CallbackData": "",
+                    }
+                    writer.writerow(csv_data)
+                else:
+                    json_back = {
+                        "event": "VirtualObject/Spawn",
+                        "payload":
+                            {
+                                "object_id": "",
+                                "object_class": "ImageDisplay",
+                                "name": device['description'],
+                                "tags": tags,
+                                "visible": 'true',
+                                "transform": transform,
+                                "class_prop": classprop,
+                                "callback_data":
+                                    {
+                                    }
+                            }
+                    }
+                    await self.send_to_clients(json.dumps(json_back))
 
 
 if __name__ == "__main__":
