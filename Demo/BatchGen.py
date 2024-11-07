@@ -12,7 +12,7 @@ from WebServer import WebSocketServer
 import AlgorithmTool
 
 port = 4567
-file_path = 'D:/DgeneProjects/futurecitydata/all.csv'
+file_path = 'D:/DgeneProjects/futurecitydata/all_1101.csv'
 grouped_data = {}
 room_location = defaultdict(dict)
 room_valid_points = defaultdict(lambda: np.zeros((1, 2)))
@@ -20,13 +20,18 @@ room_valid_points = defaultdict(lambda: np.zeros((1, 2)))
 
 class CustomWebSocketServer(WebSocketServer):
     async def process_client_message(self, json_data):
+        # delete under this 3 line if working on 5.1
+        json_data = json_data.get('result')
+        if not json_data:
+            return
 
         if json_data['event'] == "SmartBuilding/GetRoomLocation":
-            room_id = json_data['payload']['room_id']
+            # room_id = json_data['payload']['room_id']
+            # print(f"收到房间信息: {room_id}")
             if json_data['status'] == 0:
+                room_id = json_data['payload']['room_id']
                 # 每收到一个房间信息，计算并存储可用位置
                 room_location[room_id] = json_data['payload']['location']['Translation']
-                # print(f"房间 {room_id} 位置信息: {room_location[room_id]}")
                 rotation = json_data['payload']['location']['Rotation']
                 scale = json_data['payload']['location']['Scale3D']
                 vertices = json_data['payload']['Vertices']
@@ -41,8 +46,8 @@ class CustomWebSocketServer(WebSocketServer):
                 valid_points = AlgorithmTool.grid_points_in_polygon(polygon, 120, 80)
 
                 room_valid_points[room_id] = valid_points
-            else:
-                print("房间不存在: ", room_id)
+            # else:
+            #     print("房间不存在: ", room_id)
 
             return
         else:
@@ -80,88 +85,91 @@ class CustomWebSocketServer(WebSocketServer):
 
     async def set_points(self, file):
         if file:
-            with open("./output.csv", mode='w', newline='', encoding='utf-8') as csvfile:
-                fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
+            csvfile =  open("./output.csv", mode='w', newline='', encoding='utf-8')
+            fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
                               "ParentObjectId", "CallbackData"]
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+        try:
+            for location_id, devices in grouped_data.items():
+
+                if location_id not in room_location:
+                    print(f"房间 {location_id} 不存在, 因此未计算可用位置。")
+                    continue
+
+                if(room_valid_points[location_id].shape[0] < len(devices)):
+                    print(f"房间 {location_id} 可用位置为{room_valid_points[location_id].shape[0]}不足{len(devices)}，无法生成所有设备。")
+                    continue
+
+                selected_points = room_valid_points[location_id][np.random.choice(room_valid_points[location_id].shape[0], len(devices), replace=False)]
+                np.random.shuffle(selected_points)
+                # print(f"{location_id}当前房间高度: {room_location[location_id]['Z']}")
+                for i, device in enumerate(devices):
+                    transform = {
+                        "coord_type": "UE4",
+                        "cad_mapkey": "",
+                        "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
+                                  "y": room_location[location_id]['Y'] + selected_points[i][1],
+                                  "z": room_location[location_id]['Z']},
+                        "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
+                        "scale": {"x": 1, "y": 1, "z": 1}
+                    }
+
+                    classprop = {
+                                        "name": device['description'],
+                                        "Type": "Type1",
+                                        "auto_scale": True, "image_id": "",
+                                        "image_style": {"alignment": {"X": 0.5, "Y": 1}, "image_size": {"X": 33, "Y": 33},
+                                                        "offset": {"X": 0, "Y": 0}, "tint": {"A": 1, "B": 1, "G": 1, "R": 1}},
+                                        "image_url": DataJson.description_to_img(device['description']),
+                                        "inverse_z_order": False, "point_scale": 1, "show_sphere": False,
+                                        "text_content": device['description'],
+                                        "text_style": {"alignment": {"X": 0, "Y": 1},
+                                                       "background_color": {"A": 0.6000000238418579, "B": 0, "G": 0, "R": 0},
+                                                       "font_color": {"A": 1, "B": 0.5, "G": 0.5, "R": 0.5}, "font_size": 16,
+                                                       "offset": {"X": 20, "Y": 0},
+                                                       "padding": {"Bottom": 0, "Left": 4, "Right": 4, "Top": 2.5}}
+                    }
+
+                    tags = device['assetno'].split('-')[:-1] + device['location'].split('-')[3:5]
 
 
-        for location_id, devices in grouped_data.items():
-
-            if location_id not in room_location:
-                print(f"房间 {location_id} 不存在, 因此未计算可用位置。")
-                continue
-
-            if(room_valid_points[location_id].shape[0] < len(devices)):
-                print(f"房间 {location_id} 可用位置为{room_valid_points[location_id].shape[0]}不足{len(devices)}，无法生成所有设备。")
-                continue
-
-            selected_points = room_valid_points[location_id][np.random.choice(room_valid_points[location_id].shape[0], len(devices), replace=False)]
-            np.random.shuffle(selected_points)
-            # print(f"{location_id}当前房间高度: {room_location[location_id]['Z']}")
-            for i, device in enumerate(devices):
-                transform = {
-                    "coord_type": "UE4",
-                    "cad_mapkey": "",
-                    "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
-                              "y": room_location[location_id]['Y'] + selected_points[i][1],
-                              "z": room_location[location_id]['Z']},
-                    "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
-                    "scale": {"x": 1, "y": 1, "z": 1}
-                }
-
-                classprop = {
+                    if file:
+                        csv_data = {
+                            "ObjectId": "",
+                            "objectClass*": "ImageDisplay",
+                            "名称*": device['description'],
+                            "图层": "default",
+                            "标签": ','.join(tags),
+                            "是否可见": True,
+                            "Transform*": json.dumps(transform),
+                            "ClassProp*": json.dumps(classprop),
+                            "ParentObjectId": "",
+                            "CallbackData": "",
+                        }
+                        writer.writerow(csv_data)
+                    else:
+                        json_back = {
+                            "event": "VirtualObject/Spawn",
+                            "payload":
+                                {
+                                    "object_id": "",
+                                    "object_class": "ImageDisplay",
                                     "name": device['description'],
-                                    "Type": "Type1",
-                                    "auto_scale": True, "image_id": "",
-                                    "image_style": {"alignment": {"X": 0.5, "Y": 1}, "image_size": {"X": 33, "Y": 33},
-                                                    "offset": {"X": 0, "Y": 0}, "tint": {"A": 1, "B": 1, "G": 1, "R": 1}},
-                                    "image_url": DataJson.description_to_img(device['description']),
-                                    "inverse_z_order": False, "point_scale": 1, "show_sphere": False,
-                                    "text_content": device['description'],
-                                    "text_style": {"alignment": {"X": 0, "Y": 1},
-                                                   "background_color": {"A": 0.6000000238418579, "B": 0, "G": 0, "R": 0},
-                                                   "font_color": {"A": 1, "B": 0.5, "G": 0.5, "R": 0.5}, "font_size": 16,
-                                                   "offset": {"X": 20, "Y": 0},
-                                                   "padding": {"Bottom": 0, "Left": 4, "Right": 4, "Top": 2.5}}
-                }
-
-                tags = device['assetno'].split('-')[:-1]
-
-                if file:
-                    csv_data = {
-                        "ObjectId": "",
-                        "objectClass*": "ImageDisplay",
-                        "名称*": device['description'],
-                        "图层": "default",
-                        "标签": ','.join(tags),
-                        "是否可见": True,
-                        "Transform*": json.dumps(transform),
-                        "ClassProp*": json.dumps(classprop),
-                        "ParentObjectId": "",
-                        "CallbackData": "",
-                    }
-                    writer.writerow(csv_data)
-                else:
-                    json_back = {
-                        "event": "VirtualObject/Spawn",
-                        "payload":
-                            {
-                                "object_id": "",
-                                "object_class": "ImageDisplay",
-                                "name": device['description'],
-                                "tags": tags,
-                                "visible": 'true',
-                                "transform": transform,
-                                "class_prop": classprop,
-                                "callback_data":
-                                    {
-                                    }
-                            }
-                    }
-                    await self.send_to_clients(json.dumps(json_back))
-
+                                    "tags": tags,
+                                    "visible": 'true',
+                                    "transform": transform,
+                                    "class_prop": classprop,
+                                    "callback_data":
+                                        {
+                                        }
+                                }
+                        }
+                        await self.send_to_clients(json.dumps(json_back))
+        finally:
+            if file:
+                csvfile.close()
 
 if __name__ == "__main__":
 
