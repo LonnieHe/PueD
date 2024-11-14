@@ -1,4 +1,8 @@
-﻿import json
+﻿"""
+This file implements some mathematical methods
+Usually does not require modification of the file here
+"""
+import json
 
 import cv2
 import numpy as np

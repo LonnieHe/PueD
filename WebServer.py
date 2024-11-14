@@ -27,7 +27,7 @@ class WebSocketServer:
                 try:
                     json_data = json.loads(message)
                 except json.JSONDecodeError as e:
-                    print(f"并非JSON")
+                    print(f"并非JSON message")
                     continue
                 response = await self.process_client_message(json_data)
                 if response:
