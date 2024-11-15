@@ -12,7 +12,7 @@ from WebServer import WebSocketServer
 import AlgorithmTool
 
 port = 4567
-file_path = 'D:/DgeneProjects/futurecitydata/all_1101.csv'
+file_path = 'E:/DgeneProjects/futurecitydata/all_1114.csv'
 grouped_data = {}
 room_location = defaultdict(dict)
 room_valid_points = defaultdict(lambda: np.zeros((1, 2)))
@@ -40,9 +40,11 @@ class CustomWebSocketServer(WebSocketServer):
                 points = np.array([[point['X'], point['Y'], point['Z']] for point in vertices])
                 q = np.array([rotation['X'], rotation['Y'], rotation['Z'], rotation['W']])
                 scale_factors = np.array([scale['X'], scale['Y'], scale['Z']])
-
+                # 矫正局部坐标和去重顶点
                 points = AlgorithmTool.apply_transformation(points, q, scale_factors)
+                # 生成多边形
                 polygon = AlgorithmTool.sort_polygon_vertices(points, triangles)
+                # 使用参数生成网格点
                 valid_points = AlgorithmTool.grid_points_in_polygon(polygon, 120, 80)
 
                 room_valid_points[room_id] = valid_points
@@ -106,6 +108,7 @@ class CustomWebSocketServer(WebSocketServer):
                 np.random.shuffle(selected_points)
                 # print(f"{location_id}当前房间高度: {room_location[location_id]['Z']}")
                 for i, device in enumerate(devices):
+                    # 设置基础位置
                     transform = {
                         "coord_type": "UE4",
                         "cad_mapkey": "",
@@ -115,7 +118,7 @@ class CustomWebSocketServer(WebSocketServer):
                         "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
                         "scale": {"x": 1, "y": 1, "z": 1}
                     }
-
+                    # 设置基础属性
                     classprop = {
                                         "name": device['description'],
                                         "Type": "Type1",
@@ -131,13 +134,18 @@ class CustomWebSocketServer(WebSocketServer):
                                                        "offset": {"X": 20, "Y": 0},
                                                        "padding": {"Bottom": 0, "Left": 4, "Right": 4, "Top": 2.5}}
                     }
-
-                    tags = device['assetno'].split('-')[:-1] + device['location'].split('-')[3:5]
-
-
+                    # 拼接位置tag
+                    location_tags = device['location'].split('-', 2)[2].split('-', 3)
+                    # 拼接设备tag
+                    device_tags = device['assetno'].split('-')
+                    tags = location_tags + [device_tags[2], device_tags[4]]
+                    # 如果设备tag长度大于5，且第6位是A或B，则视作设备级别加入
+                    if len(device_tags) > 5 and device_tags[5] in ['A', 'B']:
+                        tags += [device_tags[5]]
+                    # 拼接构造对应的的数据格式
                     if file:
                         csv_data = {
-                            "ObjectId": "",
+                            "ObjectId": device['assetno'],
                             "objectClass*": "ImageDisplay",
                             "名称*": device['description'],
                             "图层": "default",
@@ -154,7 +162,7 @@ class CustomWebSocketServer(WebSocketServer):
                             "event": "VirtualObject/Spawn",
                             "payload":
                                 {
-                                    "object_id": "",
+                                    "object_id": device['assetno'],
                                     "object_class": "ImageDisplay",
                                     "name": device['description'],
                                     "tags": tags,

@@ -18,7 +18,7 @@ class WebSocketServer:
         await server.wait_closed()
 
     # 处理客户端连接
-    async def handle_client(self, websocket, path):
+    async def handle_client(self, websocket):
         print(f"客户端已连接: {websocket.remote_address}")
         self.clients.add(websocket)
         try:
