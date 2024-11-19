@@ -47,24 +47,29 @@ def remove_duplicate_vertices(vertices, triangles):
     # 更新三角形的顶点索引
     updated_triangles = np.array([new_indices[vertex] for vertex in triangles])
 
-    return unique_vertices, updated_triangles
+    # 计算顶点的平均高度
+    average_height = np.mean(vertices[:, 2])
+
+
+    return unique_vertices, updated_triangles, average_height
 
 def sort_polygon_vertices(vertices, triangles):
     # 去除重复顶点
-    vertices, triangles = remove_duplicate_vertices(vertices, triangles)
+    vertices, triangles, average_height = remove_duplicate_vertices(vertices, triangles)
+
     # 构建边的计数器，统计每条边出现的次数
     edge_count = defaultdict(int)
     # 三角形数量
     num = len(triangles) / 3
 
     for i in range(int(num)):
-        # 取出三角形的每条边
-        v0 = vertices[triangles[i*3]]
-        v1 = vertices[triangles[i*3+1]]
-        v2 = vertices[triangles[i*3+2]]
+        # 计算每个顶点的高度差
+        h0 = abs(vertices[triangles[i*3]][2] - average_height)
+        h1 = abs(vertices[triangles[i*3+1]][2] - average_height)
+        h2 = abs(vertices[triangles[i*3+2]][2] - average_height)
 
-        if abs(v0[2]) > 1 or abs(v1[2]) > 1 or abs(v2[2]) > 1:
-        #   print("Z轴过远")
+        if h0 > 1 or h1 > 1 or h2 > 1:
+            print("Z轴过远")
             continue
 
         edge_count[tuple(sorted((triangles[i*3], triangles[i*3 + 1])))] += 1
@@ -164,7 +169,8 @@ def grid_points_in_polygon(polygon, step_x, step_y):
 # 生成网格分布在多边形内部的点
 # points = grid_points_in_polygon(polygon, 10)
 if __name__ == "__main__":
-    parsed_data = json.loads(DataJson.FakeMessage3)
+    import DataTemp
+    parsed_data = json.loads(DataTemp.FakeMessage2)['result']
     vertices = parsed_data['payload']['Vertices']
     rotation = parsed_data['payload']['location']['Rotation']
     scale = parsed_data['payload']['location']['Scale3D']
@@ -176,9 +182,10 @@ if __name__ == "__main__":
     print(q)
     print(scale_factors)
 
-    print(points)
+    # print(points)
     points = apply_transformation(points, q, scale_factors)
-    print(points)
+    # print(f"number of points:{len(points)}")
+    # print(points)
     # 这是以mesh的局部坐标计算
     polygon = sort_polygon_vertices(points, triangles)
     print(polygon)
