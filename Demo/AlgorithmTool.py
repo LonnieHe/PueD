@@ -148,14 +148,15 @@ def create_polygon_from_vertices(vertices, center):
 
 # 生成网格分布在多边形内部的点
 def grid_points_in_polygon(polygon, step_x, step_y):
-    # 获取多边形的外接矩形边界
-    x_min, y_min, width, height = cv2.boundingRect(polygon)
     points = []
-    # 创建网格点
-    for x in np.arange(x_min, x_min + width, step_x):
-        for y in np.arange(y_min, y_min + height, step_y):
-            if cv2.pointPolygonTest(polygon, np.array((x, y), dtype=np.float32), False) > 0:
-                points.append((x, y))
+    if len(polygon) != 0:
+        # 获取多边形的外接矩形边界
+        x_min, y_min, width, height = cv2.boundingRect(polygon)
+        # 创建网格点
+        for x in np.arange(x_min, x_min + width, step_x):
+            for y in np.arange(y_min, y_min + height, step_y):
+                if cv2.pointPolygonTest(polygon, np.array((x, y), dtype=np.float32), False) > 0:
+                    points.append((x, y))
 
     return np.array(points)
 
