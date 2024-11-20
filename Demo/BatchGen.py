@@ -25,7 +25,7 @@ class CustomWebSocketServer(WebSocketServer):
         if not json_data:
             return
 
-        if json_data['event'] == "SmartBuilding/GetRoomLocation":
+        if json_data['event'] == "SmartBuilding/GetRoomMesh":
             # room_id = json_data['payload']['room_id']
             # print(f"收到房间信息: {room_id}")
             if json_data['status'] == 0:
@@ -86,7 +86,7 @@ class CustomWebSocketServer(WebSocketServer):
     async def collect_room(self):
         for room_id in grouped_data.keys():
             json_back = {
-                "event": "SmartBuilding/GetRoomLocation",
+                "event": "SmartBuilding/GetRoomMesh",
                 "payload": {
                     "room_id": room_id
                 }
@@ -190,11 +190,15 @@ class CustomWebSocketServer(WebSocketServer):
     async def set_company(self, file):
         assetno_count = defaultdict(int)
         if file:
-            csvfile =  open("./output_company.csv", mode='w', newline='', encoding='utf-8')
-            fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
+            company_csvfile =  open("./output_company.csv", mode='w', newline='', encoding='utf-8')
+            emproom_csvfile =  open("./output_emproom.csv", mode='w', newline='', encoding='utf-8')
+            company_fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
                               "ParentObjectId", "CallbackData"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+            emproom_fieldnames = ["RoomId", "RoomColor", "Tags"]
+            company_writer = csv.DictWriter(company_csvfile, fieldnames=company_fieldnames)
+            emproom_writer = csv.DictWriter(emproom_csvfile, fieldnames=emproom_fieldnames)
+            company_writer.writeheader()
+            emproom_writer.writeheader()
 
         try:
             for location_id, devices in grouped_data.items():
@@ -211,68 +215,79 @@ class CustomWebSocketServer(WebSocketServer):
                 np.random.shuffle(selected_points)
                 # print(f"{location_id}当前房间高度: {room_location[location_id]['Z']}")
                 for i, device in enumerate(devices):
-
+                    rented = False
                     # 拼接位置tag
                     location_tags = device['location'].split('-', 2)[2].split('-', 3)
-                    # 处理楼层转换
+                    # 楼层转换Tag
                     location_tags[2] = DataJson.NumberToFloorTable.get(location_tags[2], location_tags[2])
-                    # 拼接企业状态tag
+                    # 企业状态tag
                     tags = location_tags + ["公司企业", device['code']]
-                    # 企业id还需要额外去重
-                    assetno_count[device['assetno']] += 1
-                    count = assetno_count[device['assetno']]
+                    # 如果是出租状态，则需要详细信息
+                    if device['code'] == '出租':
+                        rented = True
+                        # 企业id还需要额外去重
+                        assetno_count[device['assetno']] += 1
+                        count = assetno_count[device['assetno']]
 
-                    object_id = "" if device['assetno'] == "" else f"{device['assetno']}_{count}"
-                    name = device['description']
-                    # 设置基础位置
-                    transform = {
-                        "coord_type": "UE4",
-                        "cad_mapkey": "",
-                        "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
-                                  "y": room_location[location_id]['Y'] + selected_points[i][1],
-                                  "z": room_location[location_id]['Z']},
-                        "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
-                        "scale": {"x": 1, "y": 1, "z": 1}
-                    }
-                    # 设置基础属性
-                    classprop = {
-                        "name": name,
-                        "Type": "Type1",
-                        "auto_scale": True, "image_id": "",
-                        "image_style": {"alignment": {"X": 0.5, "Y": 1}, "image_size": {"X": 90, "Y": 780},
-                                        "offset": {"X": 0, "Y": 0}, "tint": {"A": 1, "B": 1, "G": 1, "R": 1}},
-                        "image_url": "http://192.168.53.145/minio/zjelder/upload%2Fimage%2FICON_GSQY_M%402x.png",
-                        "inverse_z_order": True, "point_scale": 1, "show_sphere": False,
-                        "text_content": name,
-                        "text_style": {
-                            "alignment": {"X": 0, "Y": 1},
-                            "padding": {"Left": 4, "Top": 2.5, "Right": 4, "Bottom": 0},
-                            "font_size": 24,
-                            "font_color": {"R": 1, "G": 1, "B": 1, "A": 1},
-                            "background_color": {"R": 0, "G": 0, "B": 0, "A": 0
-                                                 },
-                            "offset": {"X": -20, "Y": 18 * len(str(device['description'])) - 500},
-                            "point_scale": 1,
-                            "auto_scale": True
+                        object_id = "" if device['assetno'] == "" else f"{device['assetno']}_{count}"
+                        name = device['description']
+                        # 设置基础位置
+                        transform = {
+                            "coord_type": "UE4",
+                            "cad_mapkey": "",
+                            "coord": {"x": room_location[location_id]['X'] + selected_points[i][0],
+                                      "y": room_location[location_id]['Y'] + selected_points[i][1],
+                                      "z": room_location[location_id]['Z']},
+                            "rotate": {"roll": 0, "pitch": 0, "yaw": 0},
+                            "scale": {"x": 1, "y": 1, "z": 1}
                         }
-                    }
+                        # 设置基础属性
+                        classprop = {
+                            "name": name,
+                            "Type": "Type1",
+                            "auto_scale": True, "image_id": "",
+                            "image_style": {"alignment": {"X": 0.5, "Y": 1}, "image_size": {"X": 90, "Y": 780},
+                                            "offset": {"X": 0, "Y": 0}, "tint": {"A": 1, "B": 1, "G": 1, "R": 1}},
+                            "image_url": "http://192.168.53.145/minio/zjelder/upload%2Fimage%2FICON_GSQY_M%402x.png",
+                            "inverse_z_order": True, "point_scale": 1, "show_sphere": False,
+                            "text_content": name,
+                            "text_style": {
+                                "alignment": {"X": 0, "Y": 1},
+                                "padding": {"Left": 4, "Top": 2.5, "Right": 4, "Bottom": 0},
+                                "font_size": 24,
+                                "font_color": {"R": 1, "G": 1, "B": 1, "A": 1},
+                                "background_color": {"R": 0, "G": 0, "B": 0, "A": 0
+                                                     },
+                                "offset": {"X": -20, "Y": 18 * len(str(device['description'])) - 500},
+                                "point_scale": 1,
+                                "auto_scale": True
+                            }
+                        }
 
                     # 拼接构造对应的的数据格式
                     if file:
-                        csv_data = {
-                            "ObjectId": object_id,
-                            "objectClass*": "ImageDisplayVertical",
-                            "名称*": device['description'],
-                            "图层": "default",
-                            "标签": ','.join(tags),
-                            "是否可见": True,
-                            "Transform*": json.dumps(transform),
-                            "ClassProp*": json.dumps(classprop),
-                            "ParentObjectId": "",
-                            "CallbackData": "",
-                        }
-                        writer.writerow(csv_data)
-                    else:
+                        if rented:
+                            csv_data = {
+                                "ObjectId": object_id,
+                                "objectClass*": "ImageDisplayVertical",
+                                "名称*": device['description'],
+                                "图层": "default",
+                                "标签": ','.join(tags),
+                                "是否可见": True,
+                                "Transform*": json.dumps(transform),
+                                "ClassProp*": json.dumps(classprop),
+                                "ParentObjectId": "",
+                                "CallbackData": "",
+                            }
+                            company_writer.writerow(csv_data)
+                        else:
+                            csv_data = {
+                                "RoomId": location_id,
+                                "RoomColor": DataJson.RentedToColorTable[device['code']],
+                                "Tags": ','.join(tags)
+                            }
+                            emproom_writer.writerow(csv_data)
+                    elif rented:
                         json_back = {
                             "event": "VirtualObject/Spawn",
                             "payload":
@@ -292,7 +307,7 @@ class CustomWebSocketServer(WebSocketServer):
                         await self.send_to_clients(json.dumps(json_back))
         finally:
             if file:
-                csvfile.close()
+                company_csvfile.close()
 
 if __name__ == "__main__":
 

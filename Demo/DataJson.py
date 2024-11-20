@@ -72,6 +72,11 @@ NumberToFloorTable = {
     "04" : "4F",
 }
 
+RentedToColorTable = {
+    "空闲": {"R": 0, "G": 1, "B": 0, "A": 1},
+    "不可租": {"R": 64, "G": 64, "B": 64, "A": 1},
+}
+
 def description_to_img(description):
     for keyword, url in DescriptionToImgUrlTable.items():
         if keyword in description:
