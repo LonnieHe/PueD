@@ -12,7 +12,7 @@ from WebServer import WebSocketServer
 import AlgorithmTool
 
 port = 4567
-file_path = 'E:/DgeneProjects/futurecitydata/房源信息-20241114处理版.CSV'
+file_path = 'E:/DgeneProjects/futurecitydata/房源信息-20241121.csv'
 grouped_data = {}
 room_location = defaultdict(dict)
 room_valid_points = defaultdict(lambda: np.zeros((1, 2)))
@@ -280,13 +280,13 @@ class CustomWebSocketServer(WebSocketServer):
                                 "CallbackData": "",
                             }
                             company_writer.writerow(csv_data)
-                        else:
-                            csv_data = {
-                                "RoomId": location_id,
-                                "RoomColor": DataJson.RentedToColorTable[device['code']],
-                                "Tags": ','.join(tags)
-                            }
-                            emproom_writer.writerow(csv_data)
+                        # 写入房间信息
+                        room_csv_data = {
+                            "RoomId": location_id,
+                            "RoomColor": DataJson.RentedToColorTable[device['code']],
+                            "Tags": ','.join(tags)
+                        }
+                        emproom_writer.writerow(room_csv_data)
                     elif rented:
                         json_back = {
                             "event": "VirtualObject/Spawn",
