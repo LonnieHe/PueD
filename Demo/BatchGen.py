@@ -190,8 +190,10 @@ class CustomWebSocketServer(WebSocketServer):
     async def set_company(self, file):
         assetno_count = defaultdict(int)
         if file:
-            company_csvfile =  open("./output_company.csv", mode='w', newline='', encoding='utf-8')
-            emproom_csvfile =  open("./output_emproom.csv", mode='w', newline='', encoding='utf-8')
+            company_csv_file_path = "./output_company.csv"
+            emproom_csv_file_path = "./output_emproom.csv"
+            company_csvfile =  open(company_csv_file_path, mode='w', newline='', encoding='utf-8')
+            emproom_csvfile =  open(emproom_csv_file_path, mode='w', newline='', encoding='utf-8')
             company_fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
                               "ParentObjectId", "CallbackData"]
             emproom_fieldnames = ["RoomId", "RoomColor", "Tags"]
@@ -219,7 +221,8 @@ class CustomWebSocketServer(WebSocketServer):
                     # 拼接位置tag
                     location_tags = device['location'].split('-', 2)[2].split('-', 3)
                     # 楼层转换Tag
-                    location_tags[2] = DataJson.NumberToFloorTable.get(location_tags[2], location_tags[2])
+                    if len(location_tags) > 2:
+                        location_tags[2] = DataJson.NumberToFloorTable.get(location_tags[2], location_tags[2])
                     # 企业状态tag
                     tags = location_tags + ["公司企业", device['code']]
                     # 如果是出租状态，则需要详细信息
@@ -266,6 +269,7 @@ class CustomWebSocketServer(WebSocketServer):
 
                     # 拼接构造对应的的数据格式
                     if file:
+                        # 出租的房间要写入公司表
                         if rented:
                             csv_data = {
                                 "ObjectId": object_id,
@@ -274,8 +278,8 @@ class CustomWebSocketServer(WebSocketServer):
                                 "图层": "default",
                                 "标签": ','.join(tags),
                                 "是否可见": True,
-                                "Transform*": json.dumps(transform),
-                                "ClassProp*": json.dumps(classprop),
+                                "Transform*": str(json.dumps(transform, ensure_ascii=False)),
+                                "ClassProp*": str(json.dumps(classprop, ensure_ascii=False)),
                                 "ParentObjectId": "",
                                 "CallbackData": "",
                             }
@@ -308,6 +312,13 @@ class CustomWebSocketServer(WebSocketServer):
         finally:
             if file:
                 company_csvfile.close()
+                # with open(company_csv_file_path, "r+", encoding="utf-8") as csvfile:
+                #     content = csvfile.read()  # 读取文件内容
+                #     csvfile.seek(0)  # 回到文件开头
+                #     csvfile.write(content.replace('\0', ""))  # 替换并写回
+                #     csvfile.truncate()  # 截断多余内容
+                # csvfile.close()
+        # 去除文件中的空字符
 
 if __name__ == "__main__":
 
