@@ -12,7 +12,9 @@ from WebServer import WebSocketServer
 import AlgorithmTool
 
 port = 4567
-file_path = 'E:/DgeneProjects/futurecitydata/房源信息-20241121.csv'
+# 现在只能手动在这里切换读入的文件
+# file_path = 'E:/DgeneProjects/futurecitydata/房源信息-20241121.csv'
+file_path = "E:/DgeneProjects/futurecitydata/all_1114_HD.csv"
 grouped_data = {}
 room_location = defaultdict(dict)
 room_valid_points = defaultdict(lambda: np.zeros((1, 2)))
@@ -95,7 +97,7 @@ class CustomWebSocketServer(WebSocketServer):
 
     async def set_points(self, file):
         if file:
-            csvfile =  open("./output.csv", mode='w', newline='', encoding='utf-8')
+            csvfile =  open("./devece_output.csv", mode='w', newline='', encoding='utf-8')
             fieldnames = ["ObjectId", "objectClass*", "名称*", "图层", "标签", "是否可见", "Transform*", "ClassProp*",
                               "ParentObjectId", "CallbackData"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -159,8 +161,8 @@ class CustomWebSocketServer(WebSocketServer):
                             "图层": "default",
                             "标签": ','.join(tags),
                             "是否可见": True,
-                            "Transform*": json.dumps(transform),
-                            "ClassProp*": json.dumps(classprop),
+                            "Transform*": json.dumps(transform, ensure_ascii=False),
+                            "ClassProp*": json.dumps(classprop, ensure_ascii=False),
                             "ParentObjectId": "",
                             "CallbackData": "",
                         }
